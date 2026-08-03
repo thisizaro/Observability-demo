@@ -20,5 +20,22 @@ package main
 //   "observability-demo/backend/internal/config",
 //   "observability-demo/backend/internal/loadgen"
 
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"observability-demo/backend/internal/api"
+	"observability-demo/backend/internal/config"
+	"observability-demo/backend/internal/loadgen"
+)
+
 func main() {
+	cfg := config.Load()
+	mgr := loadgen.NewManager(cfg)
+	srv := api.NewServer(mgr)
+
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	log.Printf("listening on %s", addr)
+	log.Fatal(http.ListenAndServe(addr, srv.Routes()))
 }
