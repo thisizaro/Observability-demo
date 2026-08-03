@@ -2,6 +2,8 @@ package loadgen
 
 import (
 	"errors"
+	"sync"
+	"time"
 
 	"observability-demo/backend/internal/config"
 )
@@ -50,11 +52,20 @@ type Status struct {
 //   - some way to stop the background goroutine Start() spawns (e.g. a
 //     chan struct{} you close in Stop())
 type Manager struct {
+	mu              sync.Mutex
+	state           State
+	cpuLoadActive   bool
+	memoryLoadBytes int
+	cfg             config.Config
+	stopCh          chan struct{}
 }
 
 // NewManager constructs a Manager in the idle state, ready to use.
 func NewManager(cfg config.Config) *Manager {
-	panic("TODO: implement NewManager")
+	return &Manager{
+		state: StateIdle,
+		cfg:   cfg,
+	}
 }
 
 // Start transitions the manager to Running and spawns a background
@@ -63,26 +74,76 @@ func NewManager(cfg config.Config) *Manager {
 // "background work + gauge" pattern used elsewhere in this package.
 // Returns ErrAlreadyRunning if already Running.
 func (m *Manager) Start() error {
-	panic("TODO: implement Start")
+	m.mu.Lock()
+	if m.state == StateRunning {
+		m.mu.Unlock()
+		return ErrAlreadyRunning
+	}
+	m.state = StateRunning
+	stopCh := make(chan struct{})
+	m.stopCh = stopCh
+	interval := time.Duration(m.cfg.LoadIntervalMs) * time.Millisecond
+	m.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				// Background traffic tick — later phases (see
+				// docs/OBSERVABILITY.md) will record a metric here.
+			}
+		}
+	}()
+
+	return nil
 }
 
 // Stop transitions the manager back to Idle and stops the background
 // goroutine started by Start(). Returns ErrNotRunning if already Idle.
 func (m *Manager) Stop() error {
-	panic("TODO: implement Stop")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.state != StateRunning {
+		return ErrNotRunning
+	}
+	close(m.stopCh)
+	m.stopCh = nil
+	m.state = StateIdle
+	return nil
 }
 
 // Reset clears all state back to its zero value: Idle, no CPU load,
 // no memory load. Unlike Stop(), Reset() never errors — it's valid to
 // call from any state.
 func (m *Manager) Reset() {
-	panic("TODO: implement Reset")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.state == StateRunning && m.stopCh != nil {
+		close(m.stopCh)
+		m.stopCh = nil
+	}
+	m.state = StateIdle
+	m.cpuLoadActive = false
+	m.memoryLoadBytes = 0
 }
 
 // Status returns a snapshot of the current state. Safe to call
 // concurrently with Start/Stop/Trigger*.
 func (m *Manager) Status() Status {
-	panic("TODO: implement Status")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return Status{
+		LoadGeneration:  m.state,
+		CPULoadActive:   m.cpuLoadActive,
+		MemoryLoadBytes: m.memoryLoadBytes,
+	}
 }
 
 // TriggerCPULoad spins up CPU-bound work in a background goroutine for
@@ -90,12 +151,46 @@ func (m *Manager) Status() Status {
 // and false once it completes. Returns immediately — the caller
 // (an HTTP handler) should not block on the load finishing.
 func (m *Manager) TriggerCPULoad() {
-	panic("TODO: implement TriggerCPULoad")
+	m.mu.Lock()
+	m.cpuLoadActive = true
+	duration := time.Duration(m.cfg.CPULoadDurationMs) * time.Millisecond
+	m.mu.Unlock()
+
+	go func() {
+		deadline := time.Now().Add(duration)
+		for time.Now().Before(deadline) {
+			// Busy-loop to actually consume CPU rather than sleeping.
+		}
+
+		m.mu.Lock()
+		m.cpuLoadActive = false
+		m.mu.Unlock()
+	}()
 }
 
 // TriggerMemoryLoad allocates cfg.MemoryLoadMB megabytes and holds them
 // for cfg.MemoryLoadDurationMs, setting MemoryLoadBytes accordingly and
 // back to 0 once released. Returns immediately, same as TriggerCPULoad.
 func (m *Manager) TriggerMemoryLoad() {
-	panic("TODO: implement TriggerMemoryLoad")
+	m.mu.Lock()
+	sizeBytes := m.cfg.MemoryLoadMB * 1024 * 1024
+	duration := time.Duration(m.cfg.MemoryLoadDurationMs) * time.Millisecond
+	m.memoryLoadBytes = sizeBytes
+	m.mu.Unlock()
+
+	// Actually allocate and touch the memory so it's real resident
+	// memory, not just a number stored in a variable.
+	buf := make([]byte, sizeBytes)
+	for i := range buf {
+		buf[i] = 1
+	}
+
+	go func() {
+		time.Sleep(duration)
+		_ = buf // keep the allocation alive until the sleep completes
+
+		m.mu.Lock()
+		m.memoryLoadBytes = 0
+		m.mu.Unlock()
+	}()
 }
