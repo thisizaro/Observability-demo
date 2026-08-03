@@ -73,6 +73,7 @@ Phases are sequenced so each one builds on a working, testable artifact from the
 - [ ] Validate troubleshooting notes against the live deployment
 - [ ] Add README screenshots/GIF
 - [ ] Final consistency pass across all docs
+- [ ] Add rate-limiting middleware on the backend (deferred from Phase 2; the public Render deployment has no auth per [DECISIONS.md](DECISIONS.md) ADR-006, so basic abuse protection on load-triggering endpoints is worth adding before Phase 8 wraps up)
 
 ## Related Documents
 
