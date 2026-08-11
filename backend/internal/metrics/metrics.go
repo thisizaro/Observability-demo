@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Metrics holds every metric from docs/OBSERVABILITY.md's catalog,
@@ -60,5 +61,60 @@ type Metrics struct {
 // Then build and return the *Metrics struct with the Registry and the
 // five named fields above.
 func New(startTime time.Time) *Metrics {
-	panic("TODO: implement New")
+	registry := prometheus.NewRegistry()
+	factory := promauto.With(registry)
+
+	httpRequestsTotal := factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total synthetic requests recorded, by outcome.",
+		},
+		[]string{"result"},
+	)
+
+	httpRequestDuration := factory.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "Distribution of synthetic request latencies.",
+		},
+		[]string{"result"},
+	)
+
+	loadGenerationStatus := factory.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "load_generation_status",
+			Help: "1 if background load generation is running, 0 if idle.",
+		},
+	)
+
+	cpuLoadActive := factory.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "cpu_load_active",
+			Help: "1 while a CPU load burst is running, 0 otherwise.",
+		},
+	)
+
+	memoryLoadBytes := factory.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "memory_load_bytes",
+			Help: "Bytes currently held by an active memory load burst, 0 when idle.",
+		},
+	)
+
+	factory.NewCounterFunc(
+		prometheus.CounterOpts{
+			Name: "backend_uptime_seconds",
+			Help: "Seconds since the backend process started.",
+		},
+		func() float64 { return time.Since(startTime).Seconds() },
+	)
+
+	return &Metrics{
+		Registry:             registry,
+		HTTPRequestsTotal:    httpRequestsTotal,
+		HTTPRequestDuration:  httpRequestDuration,
+		LoadGenerationStatus: loadGenerationStatus,
+		CPULoadActive:        cpuLoadActive,
+		MemoryLoadBytes:      memoryLoadBytes,
+	}
 }
