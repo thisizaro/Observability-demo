@@ -9,8 +9,8 @@ This is a living document. The phase table gives the bird's-eye sequencing; the 
 | Phase | Goal | Deliverables | Status |
 |-------|------|---------------|--------|
 | 1. Documentation | Fully specify the system before writing code | All docs in `/docs` finalized and internally consistent, `DECISIONS.md` seeded | Complete |
-| 2. Backend | Implement the API contract and load-generator logic | Go service implementing every endpoint in [API_SPEC.md](API_SPEC.md) | Not started |
-| 3. Frontend | Implement the control panel | React app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Not started |
+| 2. Backend | Implement the API contract and load-generator logic | Go service implementing every endpoint in [API_SPEC.md](API_SPEC.md) | Complete |
+| 3. Frontend | Implement the control panel | React/TypeScript app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Not started (spec rewritten to TS; prior JS implementation removed) |
 | 4. Prometheus Integration | Instrument the backend | `/metrics` exposes every metric in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
 | 5. Grafana Dashboards | Build the dashboards | Dashboard JSON for all panels in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
 | 6. Docker | Wire the full stack together locally | `docker-compose.yml` per [DOCKER.md](DOCKER.md), one-command startup | Not started |
@@ -31,21 +31,23 @@ Phases are sequenced so each one builds on a working, testable artifact from the
 - [x] Write DOCKER.md
 - [x] Write DEPLOYMENT.md
 - [x] Write ROADMAP.md
-- [ ] Write DECISIONS.md
-- [ ] Write README.md
+- [x] Write DECISIONS.md
+- [x] Write README.md
 
 ### Phase 2 — Backend
-- [ ] Scaffold Go module and package layout per [BACKEND.md](BACKEND.md)
-- [ ] Implement load-generator state machine
-- [ ] Implement all `/api` endpoints per [API_SPEC.md](API_SPEC.md)
-- [ ] Implement `/health`
-- [ ] Add unit tests for the state machine and handlers
+- [x] Scaffold Go module and package layout per [BACKEND.md](BACKEND.md)
+- [x] Implement load-generator state machine (`internal/loadgen`, race-clean)
+- [x] Implement all `/api` endpoints per [API_SPEC.md](API_SPEC.md)
+- [x] Implement `/health`
+- [x] Add unit tests for the state machine and handlers (21 tests passing)
 
 ### Phase 3 — Frontend
-- [ ] Scaffold Vite + React app
-- [ ] Implement `ControlPanel`, `LoadGenControls`, `TrafficControls`, `ResourceControls`
-- [ ] Implement `StatusPanel` with polling
-- [ ] Implement `ExternalLinks` and `ResetButton`
+FRONTEND.md was rewritten to a TypeScript + single-config-array design (see the file for the current `api.ts`/`useStatus.ts`/`ActionButton.tsx` structure); the earlier plain-JS implementation (separate `LoadGenControls`/`TrafficControls`/`ResourceControls`/`ResetButton` components) was removed and needs to be rebuilt against the new spec.
+- [ ] Scaffold Vite + React + TypeScript app
+- [ ] Implement `api.ts` (typed fetch functions per [API_SPEC.md](API_SPEC.md))
+- [ ] Implement `useStatus.ts` polling hook
+- [ ] Implement `ActionButton.tsx` and the action-config array in `App.tsx`
+- [ ] Implement `StatusPanel.tsx` and `ExternalLinks.tsx`
 - [ ] Wire environment variables per [FRONTEND.md](FRONTEND.md)
 
 ### Phase 4 — Prometheus Integration
