@@ -17,8 +17,10 @@ to talk to the backend.
 
 - React + Vite + **TypeScript** (not JS — type request/response shapes
   against the API below so a contract mismatch is a compile error)
-- No state management library, no CSS framework, no routing
-- Plain `fetch`, no axios/react-query
+- Everything else (state management, styling approach, HTTP client)
+  is an open choice — pick whatever fits a small single-page app like
+  this. It's a one-page control panel, so simple is generally better,
+  but that's a judgment call, not a rule.
 
 ## File structure to produce
 
@@ -124,20 +126,19 @@ update right after an action.
 
 - No login/auth
 - No embedding of Prometheus/Grafana UI — links only
-- No routing — one page
 - No charts/graphs in this app
 
 ---
 
 ## Ready-to-paste build prompt
 
-> Build a React + Vite + TypeScript single-page app in `frontend/`.
-> Follow the file structure, environment variables, API contract, and
-> UI action list exactly as specified in `frontend/BUILD_BRIEF.md` in
-> this repo. Key points: one generic `ActionButton` component driven
-> by a config array (not one component per button), a `useStatus`
-> hook polling `GET /api/status` every 2 seconds, typed `api.ts`
-> functions for every endpoint in the brief's contract table, and a
-> confirmation prompt before firing the reset action. No state
-> library, no CSS framework, no routing. When done, run `npm run
-> build` to confirm it compiles cleanly.
+> Build a React + Vite + TypeScript app in `frontend/`. Follow the
+> environment variables, API contract, and UI action list exactly as
+> specified in `frontend/BUILD_BRIEF.md` in this repo. Key points: one
+> generic `ActionButton` component driven by a config array (not one
+> component per button), a `useStatus` hook polling `GET /api/status`
+> every 2 seconds, typed `api.ts` functions for every endpoint in the
+> brief's contract table, and a confirmation prompt before firing the
+> reset action. Beyond that, use your own judgment for state
+> management, styling, and any other libraries. When done, run `npm
+> run build` to confirm it compiles cleanly.
