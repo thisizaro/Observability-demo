@@ -10,8 +10,8 @@ This is a living document. The phase table gives the bird's-eye sequencing; the 
 |-------|------|---------------|--------|
 | 1. Documentation | Fully specify the system before writing code | All docs in `/docs` finalized and internally consistent, `DECISIONS.md` seeded | Complete |
 | 2. Backend | Implement the API contract and load-generator logic | Go service implementing every endpoint in [API_SPEC.md](API_SPEC.md) | Complete |
-| 3. Frontend | Implement the control panel | React/TypeScript app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Not started (spec rewritten to TS; prior JS implementation removed) |
-| 4. Prometheus Integration | Instrument the backend | `/metrics` exposes every metric in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
+| 3. Frontend | Implement the control panel | React/TypeScript app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Complete |
+| 4. Prometheus Integration | Instrument the backend | `/metrics` exposes every metric in [OBSERVABILITY.md](OBSERVABILITY.md) | Complete |
 | 5. Grafana Dashboards | Build the dashboards | Dashboard JSON for all panels in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
 | 6. Docker | Wire the full stack together locally | `docker-compose.yml` per [DOCKER.md](DOCKER.md), one-command startup | Not started |
 | 7. Deployment | Ship to Render | Live deployment per [DEPLOYMENT.md](DEPLOYMENT.md) | Not started |
@@ -42,18 +42,18 @@ Phases are sequenced so each one builds on a working, testable artifact from the
 - [x] Add unit tests for the state machine and handlers (21 tests passing)
 
 ### Phase 3 — Frontend
-FRONTEND.md was rewritten to a TypeScript + single-config-array design (see the file for the current `api.ts`/`useStatus.ts`/`ActionButton.tsx` structure); the earlier plain-JS implementation (separate `LoadGenControls`/`TrafficControls`/`ResourceControls`/`ResetButton` components) was removed and needs to be rebuilt against the new spec.
-- [ ] Scaffold Vite + React + TypeScript app
-- [ ] Implement `api.ts` (typed fetch functions per [API_SPEC.md](API_SPEC.md))
-- [ ] Implement `useStatus.ts` polling hook
-- [ ] Implement `ActionButton.tsx` and the action-config array in `App.tsx`
-- [ ] Implement `StatusPanel.tsx` and `ExternalLinks.tsx`
-- [ ] Wire environment variables per [FRONTEND.md](FRONTEND.md)
+Built against the TypeScript + single-config-array spec (React + Vite + TypeScript + Tailwind; built externally, then verified end-to-end against the running backend).
+- [x] Scaffold Vite + React + TypeScript app
+- [x] Implement `api.ts` (typed fetch functions per [API_SPEC.md](API_SPEC.md))
+- [x] Implement `useStatus.ts` polling hook
+- [x] Implement `ActionButton.tsx` and the action-config array in `App.tsx`
+- [x] Implement `StatusPanel.tsx` and `ExternalLinks.tsx`
+- [x] Wire environment variables per [FRONTEND.md](FRONTEND.md)
 
 ### Phase 4 — Prometheus Integration
-- [ ] Add `prometheus/client_golang` dependency
-- [ ] Instrument all metrics from the catalog in [OBSERVABILITY.md](OBSERVABILITY.md)
-- [ ] Verify `/metrics` output manually via curl
+- [x] Add `prometheus/client_golang` dependency
+- [x] Instrument all metrics from the catalog in [OBSERVABILITY.md](OBSERVABILITY.md) (`internal/metrics`, wired into every handler via `syncGauges`/`recordTraffic`)
+- [x] Verify `/metrics` output manually via curl
 
 ### Phase 5 — Grafana Dashboards
 - [ ] Stand up a temporary local Prometheus instance
