@@ -6,27 +6,32 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"observability-demo/backend/internal/loadgen"
+	"observability-demo/backend/internal/metrics"
 )
 
 // Server holds everything the HTTP handlers need. It wraps a
 // loadgen.Manager and doesn't own any state of its own beyond that —
 // see docs/BACKEND.md for why state lives in loadgen, not here.
-//
-// TODO: fields you'll likely need:
-//   - the *loadgen.Manager passed into NewServer
-//   - a startTime time.Time (set in NewServer) so handleStatus can
-//     compute uptime_seconds
 type Server struct {
 	mgr       *loadgen.Manager
 	startTime time.Time
+	metrics   *metrics.Metrics
 }
 
-// NewServer constructs a Server around the given Manager.
+// NewServer constructs a Server around the given Manager. metrics.New
+// is called here (not passed in) so startTime is guaranteed to be the
+// single shared reference point for both the API's uptime_seconds
+// field and the backend_uptime_seconds metric — no risk of the two
+// drifting apart from being set separately.
 func NewServer(mgr *loadgen.Manager) *Server {
+	startTime := time.Now()
 	return &Server{
 		mgr:       mgr,
-		startTime: time.Now(),
+		startTime: startTime,
+		metrics:   metrics.New(startTime),
 	}
 }
 
@@ -47,11 +52,56 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/traffic/success", s.handleTrafficSuccess)
 	mux.HandleFunc("POST /api/traffic/fail", s.handleTrafficFail)
 	mux.HandleFunc("POST /api/reset", s.handleReset)
+	mux.Handle("GET /metrics", promhttp.HandlerFor(s.metrics.Registry, promhttp.HandlerOpts{}))
 
 	// Order matters: withLogging wraps withCORS, so it logs the final
 	// status of every request, including CORS preflight OPTIONS
 	// requests that withCORS answers directly. See middleware.go.
 	return withLogging(withCORS(mux))
+}
+
+// syncGauges copies the Manager's current state into the three gauge
+// metrics (load_generation_status, cpu_load_active, memory_load_bytes)
+// and returns that state so callers needing it for a JSON response
+// (handleStatus) don't have to call s.mgr.Status() a second time.
+//
+// Called after every state-changing action, not just from
+// handleStatus: /metrics can be scraped independently of the frontend
+// polling /api/status, so gauges need to be current at all times, not
+// just right after a poll.
+func (s *Server) syncGauges() loadgen.Status {
+	status := s.mgr.Status()
+
+	if status.LoadGeneration == loadgen.StateRunning {
+		s.metrics.LoadGenerationStatus.Set(1)
+	} else {
+		s.metrics.LoadGenerationStatus.Set(0)
+	}
+
+	if status.CPULoadActive {
+		s.metrics.CPULoadActive.Set(1)
+	} else {
+		s.metrics.CPULoadActive.Set(0)
+	}
+
+	s.metrics.MemoryLoadBytes.Set(float64(status.MemoryLoadBytes))
+
+	return status
+}
+
+// recordTraffic increments http_requests_total for the given result
+// and observes a synthetic latency into http_request_duration_seconds.
+// The latency is fabricated (there's no real downstream call here) —
+// it exists so the histogram has a realistic-looking spread for
+// dashboards later, rather than every observation landing in the same
+// bucket.
+func (s *Server) recordTraffic(result string) {
+	s.metrics.HTTPRequestsTotal.WithLabelValues(result).Inc()
+	s.metrics.HTTPRequestDuration.WithLabelValues(result).Observe(syntheticLatencySeconds())
+}
+
+func syntheticLatencySeconds() float64 {
+	return 0.01 + rand.Float64()*0.4 // 10ms-410ms
 }
 
 // writeJSON writes body as a JSON response with the given status code.
@@ -94,7 +144,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // active). See loadgen.Status's doc comment for why that translation
 // belongs here, not in loadgen.
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	status := s.mgr.Status()
+	status := s.syncGauges()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"load_generation":    string(status.LoadGeneration),
@@ -111,6 +161,7 @@ func (s *Server) handleLoadStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "already_running", err.Error())
 		return
 	}
+	s.syncGauges()
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "running"})
 }
 
@@ -120,18 +171,21 @@ func (s *Server) handleLoadStop(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "not_running", err.Error())
 		return
 	}
+	s.syncGauges()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "idle"})
 }
 
 // POST /api/load/cpu -> 202 {"status": "cpu_load_active"}
 func (s *Server) handleCPULoad(w http.ResponseWriter, r *http.Request) {
 	s.mgr.TriggerCPULoad()
+	s.syncGauges()
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "cpu_load_active"})
 }
 
 // POST /api/load/memory -> 202 {"status": "memory_load_active"}
 func (s *Server) handleMemoryLoad(w http.ResponseWriter, r *http.Request) {
 	s.mgr.TriggerMemoryLoad()
+	s.syncGauges()
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "memory_load_active"})
 }
 
@@ -140,22 +194,38 @@ func (s *Server) handleMemoryLoad(w http.ResponseWriter, r *http.Request) {
 // however you like, there's no fixed contract on the exact number.
 func (s *Server) handleTrafficRandom(w http.ResponseWriter, r *http.Request) {
 	count := rand.Intn(5) + 1 // 1-5 requests, see docs/API_SPEC.md — no fixed contract on the count
+	for i := 0; i < count; i++ {
+		result := "success"
+		if rand.Float64() < 0.2 { // ~20% failure rate, just for a visible-but-minor error rate on dashboards
+			result = "failure"
+		}
+		s.recordTraffic(result)
+	}
 	writeJSON(w, http.StatusOK, map[string]int{"requests_generated": count})
 }
 
 // POST /api/traffic/success -> 200 {"status": "recorded", "result": "success"}
 func (s *Server) handleTrafficSuccess(w http.ResponseWriter, r *http.Request) {
+	s.recordTraffic("success")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "recorded", "result": "success"})
 }
 
 // POST /api/traffic/fail -> 200 {"status": "recorded", "result": "failure"}
 func (s *Server) handleTrafficFail(w http.ResponseWriter, r *http.Request) {
+	s.recordTraffic("failure")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "recorded", "result": "failure"})
 }
 
 // POST /api/reset -> 200 {"status": "reset"}, and the manager's state
-// (per loadgen.Manager.Reset()) goes back to idle/no load.
+// (per loadgen.Manager.Reset()) goes back to idle/no load. Note this
+// only resets loadgen's state, not the Prometheus counters
+// (HTTPRequestsTotal, HTTPRequestDuration) — counters are meant to
+// only ever increase for a process's lifetime; deliberately resetting
+// one mid-process is a Prometheus anti-pattern that breaks rate()
+// calculations, which assume a drop in value means the process
+// restarted, not that someone reset it by hand.
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	s.mgr.Reset()
+	s.syncGauges()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "reset"})
 }

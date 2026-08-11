@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"observability-demo/backend/internal/config"
@@ -216,5 +217,47 @@ func TestResetHandler_ReturnsStateToIdle(t *testing.T) {
 	decodeJSON(t, statusRec, &body)
 	if body.LoadGeneration != "idle" {
 		t.Errorf("load_generation after reset = %q, want %q", body.LoadGeneration, "idle")
+	}
+}
+
+func TestMetricsEndpoint_ReflectsTriggeredTraffic(t *testing.T) {
+	srv := newTestServer()
+	srv.Routes().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/traffic/success", nil))
+
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `http_requests_total{result="success"} 1`) {
+		t.Errorf("expected http_requests_total success=1 in /metrics output, got:\n%s", body)
+	}
+}
+
+func TestMetricsEndpoint_ReflectsLoadGenerationStatus(t *testing.T) {
+	srv := newTestServer()
+	srv.Routes().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/load/start", nil))
+
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "load_generation_status 1") {
+		t.Errorf("expected load_generation_status 1 in /metrics output, got:\n%s", body)
+	}
+}
+
+func TestMetricsEndpoint_ReflectsCPULoadActive(t *testing.T) {
+	srv := newTestServer()
+	srv.Routes().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/load/cpu", nil))
+
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "cpu_load_active 1") {
+		t.Errorf("expected cpu_load_active 1 in /metrics output, got:\n%s", body)
 	}
 }
