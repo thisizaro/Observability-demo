@@ -48,7 +48,26 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/traffic/fail", s.handleTrafficFail)
 	mux.HandleFunc("POST /api/reset", s.handleReset)
 
-	return mux
+	return withCORS(mux)
+}
+
+// withCORS allows the frontend (a different origin — e.g. localhost:5173
+// vs the backend's localhost:8080) to call this API from a browser.
+// Permissive by design: there's no auth on this API to protect (see
+// docs/DECISIONS.md ADR-006), so a wildcard origin doesn't weaken
+// anything that wasn't already open.
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // writeJSON writes body as a JSON response with the given status code.
