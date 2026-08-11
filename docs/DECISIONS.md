@@ -6,6 +6,19 @@ This is a running log of significant architectural decisions, newest first. Each
 
 ---
 
+## ADR-009: One Dockerfile per service, reused by both local Compose and Render — no separate dev/prod Docker setup
+
+**Date:** 2026-08-11
+**Status:** Accepted
+
+**Context:** Considered keeping separate `development`/`production` folders or a separate production Compose file for Docker, in case the deployment story needed to differ meaningfully between local dev and Render.
+
+**Decision:** Each service gets exactly one Dockerfile (`backend/Dockerfile`, `frontend/Dockerfile`). `infra/docker-compose.yml` (see [DOCKER.md](DOCKER.md)) is local-dev-only and wires those Dockerfiles together. Render (see [DEPLOYMENT.md](DEPLOYMENT.md)) does not use the compose file at all — it builds each service independently from the same Dockerfile (or as a static site, for the frontend). The only thing that differs between local and Render is environment variables, which both docs already document per-service.
+
+**Consequences:** No duplicated Docker configuration to keep in sync between environments. Trade-off: none identified yet — if a future self-hosted (non-Render) production target needs compose-based orchestration, a production compose file can be added then rather than now (see ADR-005's reasoning for deferring cloud-specific work until it's actually needed).
+
+---
+
 ## ADR-008: Merge METRICS, PROMETHEUS, and GRAFANA into a single OBSERVABILITY.md
 
 **Date:** 2026-08-03
