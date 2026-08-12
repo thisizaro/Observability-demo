@@ -29,37 +29,7 @@ type Metrics struct {
 // New constructs a Metrics with its own Registry and registers every
 // metric from the catalog. startTime is used to compute
 // backend_uptime_seconds dynamically at scrape time.
-//
-// TODO: for each metric, use promauto.With(registry).New___(...) —
-// this creates AND registers in one call, instead of two separate
-// steps. You'll need something like:
-//
-//	registry := prometheus.NewRegistry()
-//	factory := promauto.With(registry)
-//
-//	httpRequestsTotal := factory.NewCounterVec(
-//		prometheus.CounterOpts{Name: "http_requests_total", Help: "..."},
-//		[]string{"result"},
-//	)
-//
-//	httpRequestDuration := factory.NewHistogramVec(
-//		prometheus.HistogramOpts{Name: "http_request_duration_seconds", Help: "..."},
-//		[]string{"result"},
-//	)
-//
-//	loadGenerationStatus := factory.NewGauge(
-//		prometheus.GaugeOpts{Name: "load_generation_status", Help: "..."},
-//	)
-//	// same pattern for CPULoadActive and MemoryLoadBytes
-//
-//	factory.NewCounterFunc(
-//		prometheus.CounterOpts{Name: "backend_uptime_seconds", Help: "..."},
-//		func() float64 { return time.Since(startTime).Seconds() },
-//	)
-//	// no variable needed for this one — nothing calls methods on it
-//
-// Then build and return the *Metrics struct with the Registry and the
-// five named fields above.
+
 func New(startTime time.Time) *Metrics {
 	registry := prometheus.NewRegistry()
 	factory := promauto.With(registry)
