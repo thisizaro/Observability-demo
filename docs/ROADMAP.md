@@ -13,7 +13,7 @@ This is a living document. The phase table gives the bird's-eye sequencing; the 
 | 3. Frontend | Implement the control panel | React/TypeScript app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Complete |
 | 4. Prometheus Integration | Instrument the backend | `/metrics` exposes every metric in [OBSERVABILITY.md](OBSERVABILITY.md) | Complete |
 | 5. Grafana Dashboards | Build the dashboards | Dashboard JSON for all panels in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
-| 6. Docker | Wire the full stack together locally | `docker-compose.yml` per [DOCKER.md](DOCKER.md), one-command startup | Not started |
+| 6. Docker | Wire the full stack together locally | `docker-compose.yml` per [DOCKER.md](DOCKER.md), one-command startup | Complete |
 | 7. Deployment | Ship to Render | Live deployment per [DEPLOYMENT.md](DEPLOYMENT.md) | Not started |
 | 8. Polish | Final validation and presentation | README screenshots, troubleshooting notes validated against the live stack | Not started |
 
@@ -56,15 +56,15 @@ Built against the TypeScript + single-config-array spec (React + Vite + TypeScri
 - [x] Verify `/metrics` output manually via curl
 
 ### Phase 5 — Grafana Dashboards
-- [ ] Stand up a temporary local Prometheus instance
+Phase 6's Compose stack now provides a real, running Prometheus + Grafana to build against, so the "temporary local Prometheus" originally planned here isn't needed — use `docker compose -f infra/docker-compose.yml up` instead.
 - [ ] Build Traffic Overview, Resource Load, and System Status dashboards
 - [ ] Export dashboards as JSON into `infra/grafana/dashboards`
 
 ### Phase 6 — Docker
-- [ ] Write `infra/docker-compose.yml`
-- [ ] Write `infra/prometheus/prometheus.yml`
-- [ ] Write Grafana provisioning config
-- [ ] Verify full stack starts with one command and dashboards populate
+- [x] Write `infra/docker-compose.yml`
+- [x] Write `infra/prometheus/prometheus.yml`
+- [x] Write Grafana provisioning config (datasource auto-configured, dashboard provider watching `infra/grafana/dashboards`)
+- [x] Verify full stack starts with one command — confirmed: all 4 containers up, Prometheus target `backend` shows `up`, Grafana datasource auto-provisioned, and a full trigger → scrape → PromQL-query pipeline verified end to end. Dashboards themselves are still Phase 5 (the folder is watched but empty).
 
 ### Phase 7 — Deployment
 - [ ] Create Render services per [DEPLOYMENT.md](DEPLOYMENT.md)
