@@ -1,0 +1,13 @@
+# This just tells Grafana "load any .json dashboard file found in this
+# folder automatically on startup." It does not define any dashboard
+# itself — that's Phase 5 (see docs/ROADMAP.md), building the actual
+# dashboard JSON files that will get mounted into the path below.
+apiVersion: 1
+
+providers:
+  - name: 'Observability Demo Dashboards'
+    orgId: 1
+    folder: ''
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

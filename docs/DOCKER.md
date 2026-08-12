@@ -8,10 +8,12 @@ The full stack runs locally via a single `docker-compose.yml` at `infra/docker-c
 
 | Service | Image/Build | Published Port | Internal Port |
 |---------|--------------|------------------|-----------------|
-| `frontend` | Built from `frontend/` | `5173` | `5173` |
+| `frontend` | Built from `frontend/` (multi-stage: Vite build served by nginx) | `5173` | `80` |
 | `backend` | Built from `backend/` | `8080` | `8080` |
 | `prometheus` | `prom/prometheus` | `9090` | `9090` |
 | `grafana` | `grafana/grafana` | `3000` | `3000` |
+
+The frontend's internal port is nginx's default (`80`), not the Vite dev server's `5173` — the Docker build produces a static, already-built app; nothing is running `vite dev` inside the container.
 
 `backend`'s port is published in local dev for convenience (direct `curl`/browser access to `/metrics` or `/health`), even though only `frontend` and `prometheus` need to reach it over the internal network in principle.
 

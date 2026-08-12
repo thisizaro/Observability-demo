@@ -1,0 +1,65 @@
+networks:
+  observability-demo:
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+services:
+  backend:
+    build:
+      context: ../backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+    networks:
+      - observability-demo
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        # These become literal strings baked into the built JS — see
+        # the ARG/ENV block in frontend/Dockerfile. They point at
+        # localhost, not the "backend" service name, because it's the
+        # host browser making these calls, not a container on this
+        # network — see docs/DOCKER.md's Environment Variable Wiring note.
+        VITE_BACKEND_URL: http://localhost:8080
+        VITE_PROMETHEUS_URL: http://localhost:9090
+        VITE_GRAFANA_URL: http://localhost:3000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - observability-demo
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - observability-demo
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Local-dev convenience only — not meant for a real deployment.
+      # See docs/DOCKER.md's Environment Variable Wiring note.
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus
+    networks:
+      - observability-demo
