@@ -12,7 +12,7 @@ This is a living document. The phase table gives the bird's-eye sequencing; the 
 | 2. Backend | Implement the API contract and load-generator logic | Go service implementing every endpoint in [API_SPEC.md](API_SPEC.md) | Complete |
 | 3. Frontend | Implement the control panel | React/TypeScript app implementing every action in [FRONTEND.md](FRONTEND.md) against the live backend | Complete |
 | 4. Prometheus Integration | Instrument the backend | `/metrics` exposes every metric in [OBSERVABILITY.md](OBSERVABILITY.md) | Complete |
-| 5. Grafana Dashboards | Build the dashboards | Dashboard JSON for all panels in [OBSERVABILITY.md](OBSERVABILITY.md) | Not started |
+| 5. Grafana Dashboards | Build the dashboards | Dashboard JSON for all panels in [OBSERVABILITY.md](OBSERVABILITY.md) | Complete |
 | 6. Docker | Wire the full stack together locally | `docker-compose.yml` per [DOCKER.md](DOCKER.md), one-command startup | Complete |
 | 7. Deployment | Ship to Render | Live deployment per [DEPLOYMENT.md](DEPLOYMENT.md) | Not started |
 | 8. Polish | Final validation and presentation | README screenshots, troubleshooting notes validated against the live stack | Not started |
@@ -56,9 +56,9 @@ Built against the TypeScript + single-config-array spec (React + Vite + TypeScri
 - [x] Verify `/metrics` output manually via curl
 
 ### Phase 5 — Grafana Dashboards
-Phase 6's Compose stack now provides a real, running Prometheus + Grafana to build against, so the "temporary local Prometheus" originally planned here isn't needed — use `docker compose -f infra/docker-compose.yml up` instead.
-- [ ] Build Traffic Overview, Resource Load, and System Status dashboards
-- [ ] Export dashboards as JSON into `infra/grafana/dashboards`
+Built against the real Compose stack rather than a temporary standalone Prometheus. All three dashboards auto-load via the file provisioner (no manual import) and confirmed showing live data after triggering actions from the control panel.
+- [x] Build Traffic Overview, Resource Load, and System Status dashboards
+- [x] Export dashboards as JSON into `infra/grafana/dashboards`
 
 ### Phase 6 — Docker
 - [x] Write `infra/docker-compose.yml`
